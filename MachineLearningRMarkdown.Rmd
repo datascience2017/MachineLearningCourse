@@ -1,0 +1,173 @@
+---
+title: "Study on Activity Data with Machine Learning COncepts"
+keep_md: yes
+date: "November 15, 2017"
+output:
+  html_document:
+    keep_md: yes
+  md_document:
+    variant: markdown_github
+  pdf_document: default
+---
+
+
+###Data Information
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+We were provided with two files: training data: pml-training and testing data: pml-testing.
+
+
+###Loading data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.width=10, fig.height=5)
+options(width=120)
+suppressMessages(library(rattle))
+suppressMessages(library(caret))
+suppressMessages(library(forecast))
+suppressMessages(library(AER))
+suppressMessages(library(ggplot2))
+suppressMessages(library(AppliedPredictiveModeling))
+suppressMessages(library(kernlab))
+suppressMessages(library(randomForest))
+suppressMessages(library(parallel))
+suppressMessages(library(rpart.plot))
+suppressMessages(library(splines))
+suppressMessages(library(gbm))
+suppressMessages(library(MASS))
+```
+
+```{r echo = TRUE}
+training <- read.csv("pml-training.csv",header = TRUE, sep = ",")
+testing <- read.csv("pml-testing.csv",header = TRUE, sep = ",")
+```
+
+###Data Cleaning
+We have 19622 obersvations and   160 variables in oour training dataset.
+We need to understand the amount of missing values in our training data. Any variable missing more than 50% should not be used because they can give a false impression of the relationship with the dependent and hence can pollute the model. In our study we will eliminate all variables with any missing values to be on the conservative side.
+Count of missing values for each variable
+```{r}
+Missing_Values <- sapply(training,function(x) sum(is.na(x)))
+MissingValues <- as.data.frame(Missing_Values)
+name <- row.names(MissingValues)
+count_missing <- cbind(name,MissingValues)
+row.names(count_missing) <- NULL
+colnames(count_missing) <- c("variable", "Count Missing")
+```
+We will now filter out the data with any missing values.
+```{r}
+Newdata <-  as.character(count_missing$variable[which(count_missing$`Count Missing`<=1)])
+training <- training[Newdata]
+```
+We have now filtered all the missing variables and now have 19622 obervations and 93 variables in our training dataset.
+
+Removing irrelevant variables from our dataset as they do not give us any useful information related to the prediction/interest.
+We will remove first seven columns from the training and testing data sets because they do not contain any relevant information that will help our prediction outcome.
+```{r}
+training <- training[,-c(1:7)]
+testing <- testing[,-c(1:7)]
+```
+Removing variables with no variability or variables with zero covariates in training data set.
+```{r}
+training <-training[,-nearZeroVar(training)]
+```
+we have now filtered our training dataset and have 19622 observartions and  53 variables.
+
+###Data Partition
+Splitting the training data set into training and validation datasets by retaining 70% data in training set and 30% in validation set.
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+train_new <- training[inTrain,]
+val <- training[-inTrain,]
+```
+
+
+###Building the Model
+**Model 1- Random Forest Algorithm with 5 fold cross validation**
+```{r}
+traincontrol <- trainControl(method="cv", number=3)
+model <- train(classe~., data=train_new, method="rf", trControl = traincontrol)
+pred <- predict(model,train_new)
+rfc <- confusionMatrix(pred,train_new$classe)
+```
+
+```{r echo = FALSE}
+paste0("The overall accuracy when predicting on training data with random forest selected model is ",rfc$overall[1])
+plot(model)
+```
+
+
+
+###Model 2- Boosting:gmb 
+```{r}
+mod_boost <- train(classe~.,data=train_new,method="gbm",verbose = FALSE,trControl=traincontrol)
+predboost <- predict(mod_boost,train_new)
+c <- confusionMatrix(predboost,train_new$classe)
+plot(mod_boost)
+```
+
+```{r echo=FALSE}
+paste0("The overall accuracy when predicting on training data with boosting:gbm model is ",c$overall[1])
+```
+
+###Model 3-Linear Discriminant Analysis
+```{r }
+mod_lda <- train(classe~.,data=train_new,method="lda",verbose = FALSE,trControl=traincontrol)
+pre_lda <- predict(mod_lda,train_new)
+clda <- confusionMatrix(pre_lda,train_new$classe)
+```
+
+```{r echo=FALSE}
+paste0("The overall accuracy when predicting on training data with lda model is ",clda$overall[1])
+```
+
+
+###Model 4-Classification Tree
+```{r}
+mod_rpart <- train(classe~.,data=train_new,method="rpart",verbose = FALSE,trControl=traincontrol)
+pre_rpart <- predict(mod_rpart,train_new)
+crpart <- confusionMatrix(pre_rpart,train_new$classe)
+fancyRpartPlot(mod_rpart$finalModel)
+```
+```{r echo=FALSE}
+paste0("The overall accuracy when predicting on training data with classification trees model is ",crpart$overall[1])
+```
+
+
+*We now have 4 trained models and we will be evaluating the accuracy of each of them.*
+
+## Cross Validation
+Predicting on the validation data set.
+```{r echo=FALSE }
+pred_val_rf <- predict(model,val)
+rfc_val <- confusionMatrix(pred_val_rf,val$classe)
+paste0("The overall accuracy when predicting on validation data with random forest model is ",round(rfc_val$overall[1],3))
+
+mod_boost <- train(classe~.,data=train_new,method="gbm",trControl=traincontrol)
+predboost_val <- predict(mod_boost,val)
+c_val <- confusionMatrix(predboost_val,val$classe)
+paste0("The overall accuracy when predicting on validation data with boosting:gbm model is ",round(c_val$overall[1],3))
+
+pred_lda_val <- predict(mod_lda,val)
+clda_val <- confusionMatrix(pred_lda_val,val$classe)
+paste0("The overall accuracy when predicting on validation data with lda model is ",round(clda_val$overall[1],3))
+
+pred_rpart_val <- predict(mod_rpart,val)
+crpart_val <- confusionMatrix(pred_rpart_val,val$classe)
+paste0("The overall accuracy when predicting on validation data with Classification Trees model is ",round(crpart_val$overall[1],3))
+
+ModelAccuracyTable <- data.frame(Model=c("RandomForest", "GBM", "LDA", "Classification Tree"),
+                            Accuracy=rbind(rfc_val$overall[1],c_val$overall[1],clda_val$overall[1],crpart_val$overall[1]))
+print(ModelAccuracyTable)
+```
+
+###Conclusion
+*Based on the Overall Accuracy numbers, we can see that the Random Forest model gives us the most accurate results as compared to Classification Tree model and Linear Discriminant Analysis model.
+Hence we can accept the Random Forest Model for our study.*
+```{r echo=FALSE}
+print(rfc_val$table)
+paste0("The In Sample Error Rate for the selected model is ",round(1-rfc_val[["overall"]][["Accuracy"]],3))
+```
+
+
