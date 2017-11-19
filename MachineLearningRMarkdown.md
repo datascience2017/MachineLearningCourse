@@ -60,10 +60,10 @@ val <- training[-inTrain,]
 
 ### Building the Model
 
-**Model 1- Random Forest Algorithm with 5 fold cross validation**
+**Model 1- Random Forest Algorithm with 3 fold cross validation**
 
 ``` r
-traincontrol <- trainControl(method="cv", number=3,verboseIter=FALSE)
+traincontrol <- trainControl(method="cv", number=3,verboseIter=FALSE, allowParallel = TRUE)
 model <- train(classe~., data=train_new, method="rf", trControl = traincontrol)
 pred <- predict(model,train_new)
 rfc <- confusionMatrix(pred,train_new$classe)
@@ -84,7 +84,7 @@ plot(mod_boost)
 
 ![](MachineLearningRMarkdown_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
-    ## [1] "The overall accuracy when predicting on training data with boosting:gbm model is 0.975540511028609"
+    ## [1] "The overall accuracy when predicting on training data with boosting:gbm model is 0.974521365654801"
 
 ### Model 3-Linear Discriminant Analysis
 
@@ -94,7 +94,7 @@ pre_lda <- predict(mod_lda,train_new)
 clda <- confusionMatrix(pre_lda,train_new$classe)
 ```
 
-    ## [1] "The overall accuracy when predicting on training data with lda model is 0.702118366455558"
+    ## [1] "The overall accuracy when predicting on training data with lda model is 0.703938268908787"
 
 ### Model 4-Classification Tree
 
@@ -107,28 +107,28 @@ fancyRpartPlot(mod_rpart$finalModel)
 
 ![](MachineLearningRMarkdown_files/figure-markdown_github/unnamed-chunk-13-1.png)
 
-    ## [1] "The overall accuracy when predicting on training data with classification trees model is 0.483875664264395"
+    ## [1] "The overall accuracy when predicting on training data with classification trees model is 0.495450243866929"
 
 *We now have 4 trained models and we will be evaluating the accuracy of each of them.*
 
 Cross Validation
 ----------------
 
-Predicting on the validation data set.
+### Running the models on the validation data set and predicting values on the validation data set.
 
-    ## [1] "The overall accuracy when predicting on validation data with random forest model is 0.993"
+    ## [1] "The overall accuracy when predicting on validation data with random forest model is 0.992"
 
-    ## [1] "The overall accuracy when predicting on validation data with boosting:gbm model is 0.96"
+    ## [1] "The overall accuracy when predicting on validation data with boosting:gbm model is 0.965"
 
-    ## [1] "The overall accuracy when predicting on validation data with lda model is 0.705"
+    ## [1] "The overall accuracy when predicting on validation data with lda model is 0.71"
 
-    ## [1] "The overall accuracy when predicting on validation data with Classification Trees model is 0.475"
+    ## [1] "The overall accuracy when predicting on validation data with Classification Trees model is 0.497"
 
     ##                 Model  Accuracy
-    ## 1        RandomForest 0.9928632
-    ## 2                 GBM 0.9595582
-    ## 3                 LDA 0.7046729
-    ## 4 Classification Tree 0.4754460
+    ## 1        RandomForest 0.9923534
+    ## 2                 GBM 0.9653356
+    ## 3                 LDA 0.7104503
+    ## 4 Classification Tree 0.4966865
 
 ### Conclusion
 
@@ -136,10 +136,172 @@ Predicting on the validation data set.
 
     ##           Reference
     ## Prediction    A    B    C    D    E
-    ##          A 1671    5    0    0    0
-    ##          B    0 1127    6    0    0
-    ##          C    0    7 1020   17    0
-    ##          D    0    0    0  946    3
-    ##          E    3    0    0    1 1079
+    ##          A 1672   11    0    0    0
+    ##          B    1 1127   11    0    0
+    ##          C    0    1 1015   15    0
+    ##          D    0    0    0  948    4
+    ##          E    1    0    0    1 1078
 
-    ## [1] "The In Sample Error Rate for the selected model is 0.007"
+    ## [1] "The In Sample Error Rate for the selected model is 0.008"
+
+Appendix
+--------
+
+``` r
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.width=10, fig.height=5)
+options(width=120)
+suppressMessages(library(rattle))
+suppressMessages(library(caret))
+suppressMessages(library(forecast))
+suppressMessages(library(AER))
+suppressMessages(library(ggplot2))
+suppressMessages(library(AppliedPredictiveModeling))
+suppressMessages(library(kernlab))
+suppressMessages(library(randomForest))
+suppressMessages(library(parallel))
+suppressMessages(library(rpart.plot))
+suppressMessages(library(splines))
+suppressMessages(library(gbm))
+suppressMessages(library(MASS))
+suppressMessages(library(doParallel))
+
+training <- read.csv("pml-training.csv",header = TRUE, sep = ",")
+testing <- read.csv("pml-testing.csv",header = TRUE, sep = ",")
+
+Missing_Values <- sapply(training,function(x) sum(is.na(x)))
+MissingValues <- as.data.frame(Missing_Values)
+name <- row.names(MissingValues)
+count_missing <- cbind(name,MissingValues)
+row.names(count_missing) <- NULL
+colnames(count_missing) <- c("variable", "Count Missing")
+
+Newdata <-  as.character(count_missing$variable[which(count_missing$`Count Missing`<=1)])
+training <- training[Newdata]
+
+training <- training[,-c(1:7)]
+testing <- testing[,-c(1:7)]
+
+
+training <-training[,-nearZeroVar(training)]
+
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+train_new <- training[inTrain,]
+val <- training[-inTrain,]
+
+traincontrol <- trainControl(method="cv", number=3,verboseIter=FALSE, allowParallel = TRUE)
+model <- train(classe~., data=train_new, method="rf", trControl = traincontrol)
+pred <- predict(model,train_new)
+rfc <- confusionMatrix(pred,train_new$classe)
+
+paste0("The overall accuracy when predicting on training data with random forest selected model is ",rfc$overall[1])
+```
+
+    ## [1] "The overall accuracy when predicting on training data with random forest selected model is 1"
+
+``` r
+plot(model)
+```
+
+![](MachineLearningRMarkdown_files/figure-markdown_github/unnamed-chunk-17-1.png)
+
+``` r
+mod_boost <- train(classe~.,data=train_new,method="gbm",verbose = FALSE,trControl=traincontrol)
+predboost <- predict(mod_boost,train_new)
+c <- confusionMatrix(predboost,train_new$classe)
+plot(mod_boost)
+```
+
+![](MachineLearningRMarkdown_files/figure-markdown_github/unnamed-chunk-17-2.png)
+
+``` r
+paste0("The overall accuracy when predicting on training data with boosting:gbm model is ",c$overall[1])
+```
+
+    ## [1] "The overall accuracy when predicting on training data with boosting:gbm model is 0.974739753949188"
+
+``` r
+mod_lda <- train(classe~.,data=train_new,method="lda",verbose = FALSE,trControl=traincontrol)
+pre_lda <- predict(mod_lda,train_new)
+clda <- confusionMatrix(pre_lda,train_new$classe)
+
+paste0("The overall accuracy when predicting on training data with lda model is ",clda$overall[1])
+```
+
+    ## [1] "The overall accuracy when predicting on training data with lda model is 0.707141297226469"
+
+``` r
+mod_rpart <- train(classe~.,data=train_new,method="rpart",trControl=traincontrol)
+pre_rpart <- predict(mod_rpart,train_new)
+crpart <- confusionMatrix(pre_rpart,train_new$classe)
+fancyRpartPlot(mod_rpart$finalModel)
+```
+
+![](MachineLearningRMarkdown_files/figure-markdown_github/unnamed-chunk-17-3.png)
+
+``` r
+paste0("The overall accuracy when predicting on training data with classification trees model is ",crpart$overall[1])
+```
+
+    ## [1] "The overall accuracy when predicting on training data with classification trees model is 0.499162844871515"
+
+``` r
+pred_val_rf <- predict(model,val)
+rfc_val <- confusionMatrix(pred_val_rf,val$classe)
+paste0("The overall accuracy when predicting on validation data with random forest model is ",round(rfc_val$overall[1],3))
+```
+
+    ## [1] "The overall accuracy when predicting on validation data with random forest model is 0.992"
+
+``` r
+predboost_val <- predict(mod_boost,val)
+c_val <- confusionMatrix(predboost_val,val$classe)
+paste0("The overall accuracy when predicting on validation data with boosting:gbm model is ",round(c_val$overall[1],3))
+```
+
+    ## [1] "The overall accuracy when predicting on validation data with boosting:gbm model is 0.964"
+
+``` r
+pred_lda_val <- predict(mod_lda,val)
+clda_val <- confusionMatrix(pred_lda_val,val$classe)
+paste0("The overall accuracy when predicting on validation data with lda model is ",round(clda_val$overall[1],3))
+```
+
+    ## [1] "The overall accuracy when predicting on validation data with lda model is 0.703"
+
+``` r
+pred_rpart_val <- predict(mod_rpart,val)
+crpart_val <- confusionMatrix(pred_rpart_val,val$classe)
+paste0("The overall accuracy when predicting on validation data with Classification Trees model is ",round(crpart_val$overall[1],3))
+```
+
+    ## [1] "The overall accuracy when predicting on validation data with Classification Trees model is 0.487"
+
+``` r
+ModelAccuracyTable <- data.frame(Model=c("RandomForest", "GBM", "LDA", "Classification Tree"),
+                            Accuracy=rbind(rfc_val$overall[1],c_val$overall[1],clda_val$overall[1],crpart_val$overall[1]))
+print(ModelAccuracyTable)
+```
+
+    ##                 Model  Accuracy
+    ## 1        RandomForest 0.9921835
+    ## 2                 GBM 0.9638063
+    ## 3                 LDA 0.7028037
+    ## 4 Classification Tree 0.4870008
+
+``` r
+print(rfc_val$table)
+```
+
+    ##           Reference
+    ## Prediction    A    B    C    D    E
+    ##          A 1672    4    0    0    0
+    ##          B    0 1126    7    0    0
+    ##          C    2    9 1016    9    3
+    ##          D    0    0    3  955    9
+    ##          E    0    0    0    0 1070
+
+``` r
+paste0("The In Sample Error Rate for the selected model is ",round(1-rfc_val[["overall"]][["Accuracy"]],3))
+```
+
+    ## [1] "The In Sample Error Rate for the selected model is 0.008"
