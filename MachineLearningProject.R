@@ -12,6 +12,12 @@ library(AppliedPredictiveModeling)
 library(kernlab)
 library(randomForest)
 library(parallel)
+suppressMessages(library(rpart.plot))
+suppressMessages(library(splines))
+suppressMessages(library(gbm))
+suppressMessages(library(MASS))
+suppressMessages(library(doParallel))
+
 training <- read.csv("pml-training.csv",header = TRUE, sep = ",")
 testing <- read.csv("pml-testing.csv",header = TRUE, sep = ",")
 str(training)
@@ -72,23 +78,24 @@ dim(val) # 5885   53
 # Model1- Using Random Forest Algorithm with 5 fold cross validation to select optimum parameters
 
 traincontrol <- trainControl(method="cv", number=3)
-model <- train(classe~., data=train_new, method="rf", trControl = traincontrol)
+model <- train(classe~., data=train_new, method="rf", trControl = traincontrol,allowParallel = TRUE)
 pred <- predict(model,train_new)
 rfc <- confusionMatrix(pred,train_new$classe)
 print(rfc$overall[1]) # printing overall accuracy  1
 plot(model)
 
-mod_boost <- train(classe~.,data=train_new,method="gbm",trControl=traincontrol)
+mod_boost <- train(classe~.,data=train_new,method="gbm",verbose=FALSE, trControl=traincontrol)
 predboost <- predict(mod_boost,train_new)
 c <- confusionMatrix(predboost,train_new$classe)
 print(c$overall[1]) # printing overall accuracy 0.9737206
 plot(mod_boost)
+print(mod_boost$finalModel)
 
 mod_lda <- train(classe~.,data=train_new,method="lda",trControl=traincontrol)
 pre_lda <- predict(mod_lda,train_new)
 clda <- confusionMatrix(pre_lda,train_new$classe)
 print(clda$overall[1]) # printing overall accuracy 0.7081604 
-
+print(mod_lda$finalModel)
 
 mod_rpart <- train(classe~.,data=train_new,method="rpart",trControl=traincontrol)
 pre_rpart <- predict(mod_rpart,train_new)
@@ -106,7 +113,7 @@ pred_val_rf <- predict(model,val)
 rfc_val <- confusionMatrix(pred_val_rf,val$classe)
 print(rfc_val$overall[1]) # printing overall accuracy 0.9930331
 
-mod_boost <- train(classe~.,data=train_new,method="gbm",trControl=traincontrol)
+mod_boost <- train(classe~.,data=train_new,method="gbm",verbose=FALSE,trControl=traincontrol)
 predboost_val <- predict(mod_boost,val)
 c_val <- confusionMatrix(predboost_val,val$classe)
 print(c_val$overall[1]) #Accuracy 0.962107

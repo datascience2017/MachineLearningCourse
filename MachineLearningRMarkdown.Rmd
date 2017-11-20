@@ -3,10 +3,10 @@ title: "Study on Activity Data with Machine Learning Concepts"
 keep_md: yes
 date: "November 15, 2017"
 output:
-  md_document:
-    variant: markdown_github
   html_document:
     keep_md: yes
+  md_document:
+    variant: markdown_github
   pdf_document: default
 ---
 
@@ -78,6 +78,7 @@ we have now filtered our training dataset and have 19622 observartions and  53 v
 ###Data Partition
 Splitting the training data set into training and validation datasets by retaining 70% data in training set and 30% in validation set.
 ```{r}
+set.seed(222100)
 inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
 train_new <- training[inTrain,]
 val <- training[-inTrain,]
@@ -96,6 +97,7 @@ rfc <- confusionMatrix(pred,train_new$classe)
 ```{r echo = FALSE}
 paste0("The overall accuracy when predicting on training data with random forest selected model is ",rfc$overall[1])
 plot(model)
+print(model$finalModel)
 ```
 
 
@@ -105,11 +107,13 @@ mod_boost <- train(classe~.,data=train_new,method="gbm",verbose = FALSE,trContro
 predboost <- predict(mod_boost,train_new)
 c <- confusionMatrix(predboost,train_new$classe)
 plot(mod_boost)
+print(mod_boost$finalModel)
 ```
 
 ```{r echo=FALSE}
 paste0("The overall accuracy when predicting on training data with boosting:gbm model is ",c$overall[1])
 ```
+We can see from the plot that the accuracy increases with the maximum tree depth and number of boosting iterations.
 
 ###Model 3-Linear Discriminant Analysis
 ```{r }
